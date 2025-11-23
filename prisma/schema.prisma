@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+model Category {
+  id          String      @id @default(uuid())
+  name        String      @unique
+  description String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  items       Item[]
+  promotions  PromotionCategory[]
+
+  @@index([name])
+}
+
+model Item {
+  id          String      @id @default(uuid())
+  name        String
+  price       Float
+  categoryId  String
+  category    Category    @relation(fields: [categoryId], references: [id])
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  orderItems  OrderItem[]
+  promotions  PromotionItem[]
+
+  @@index([categoryId])
+}
+
+model Voucher {
+  id            String       @id @default(uuid())
+  code          String       @unique
+  discountType  DiscountType
+  discountValue Float
+  minOrderValue Float?
+  usageLimit    Int?
+  usedCount     Int          @default(0)
+  expiresAt     DateTime?
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  orders        Order[]
+
+  @@index([code])
+  @@index([expiresAt])
+}
+
+model Promotion {
+  id                 String       @id @default(uuid())
+  code               String       @unique
+  discountType       DiscountType
+  discountValue      Float
+  usageLimit         Int?
+  usedCount          Int          @default(0)
+  expiresAt          DateTime?
+  isActive           Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  orders             Order[]
+  eligibleCategories PromotionCategory[]
+  eligibleItems      PromotionItem[]
+
+  @@index([code])
+  @@index([expiresAt])
+}
+
+model PromotionCategory {
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  categoryId  String
+  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([promotionId, categoryId])
+}
+
+model PromotionItem {
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  itemId      String
+  item        Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@id([promotionId, itemId])
+}
+
+model Order {
+  id                 String      @id @default(uuid())
+  total              Float
+  currency           String      @default("USD")
+  appliedVoucherId   String?
+  appliedVoucher     Voucher?    @relation(fields: [appliedVoucherId], references: [id])
+  appliedPromotionId String?
+  appliedPromotion   Promotion?  @relation(fields: [appliedPromotionId], references: [id])
+  discountTotal      Float       @default(0)
+  finalTotal         Float
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  items              OrderItem[]
+
+  @@index([appliedVoucherId])
+  @@index([appliedPromotionId])
+}
+
+model OrderItem {
+  id              String   @id @default(uuid())
+  orderId         String
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  itemId          String
+  item            Item     @relation(fields: [itemId], references: [id])
+  qty             Int
+  priceAtPurchase Float
+  createdAt       DateTime @default(now())
+
+  @@index([orderId])
+  @@index([itemId])
+}
